@@ -34,7 +34,7 @@
         Parsing
         Coreference Resolution
 
-        ![screenshot](images/image.png)
+![screenshot](images/image.png)
 
 
 ### Feature Engineering
