@@ -34,7 +34,7 @@
             Parsing
             Coreference Resolution
 
-            ![Preprocessing](https://github.com/AmadGakkhar/Attention_is_all_you_need/blob/main/image.png)
+            ![screenshot](image.png)
 
 
     Feature Engineering
