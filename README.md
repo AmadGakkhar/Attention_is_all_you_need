@@ -38,8 +38,36 @@
 
 
 ### Feature Engineering
+
+Text Vectorization
+    TF-IDF
+    Bag of Words
+    Word2Vec
+    OH Encoding
+    Transfomers Model
+
 ### Modeling
+
+Choose Model
+    Open Source LLM
+    Paid Model
+        OpenAI etc.
+
 ### Evaluation
+
+1. Intrinsic Evaluation -> Metrics -> GenAI Developer
+2. Extrinsic Evaluation -> After Deployment (Feedback Incorporation)
+
 ### Deployment
+
 ### Monitoring and Model Updating
+
+
+### Common Terms
+
+Corpus -> Entire Text
+Vocabulary -> Unique Words
+Docuemnts -> Subset of the text
+Word -> Single Word
+
 
