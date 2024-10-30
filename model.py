@@ -84,3 +84,25 @@ class PositionalEncoding(nn.Module):
         """
         x = x + (self.pe[:, : x.shape[1], :]).requires_grad_(False)
         return self.dropout(x)
+
+
+## Normalization Layer
+## Normalizes the input embeddings
+
+
+class LayerNorm(nn.Module):
+    def __init__(self, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.alpha = nn.Parameter(torch.ones(1))  # Multiplicative Term of shape (1,1)
+        self.beta = nn.Parameter(torch.zeros(1))  # Aditive Term of shape (1,1)
+
+    def forward(self, x):
+        # mean is the mean of the input embeddings along the last dimension
+        # of shape (Batch_size, Sequence_length, 1)
+        mean = x.mean(dim=-1, keepdim=True)
+        # std is the standard deviation of the input embeddings along the last dimension
+        # of shape (Batch_size, Sequence_length, 1)
+        std = x.std(dim=-1, keepdim=True)
+
+        return self.alpha * (x - mean) / (std + self.eps) + self.beta
