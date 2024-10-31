@@ -210,8 +210,129 @@ class MultiHeadAttentionBlock(nn.Module):
         x, attention_score = MultiHeadAttentionBlock.attention(
             query, key, value, mask, self.dropout
         )
-
         x = (
             x.transpose(1, 2).contiguous().view(x.shape[0], -1, self.h * self.d_k)
         )  # Shape of x is (batch, seq_len, d_model)
         return self.w_o(x)
+
+        # After calculating the attention scores, the shape of x is
+        # (batch, h, seq_len, d_k). This is because the attention scores
+        # are calculated for each head (h), and the output of the attention
+        # mechanism is a weighted sum of the value vector (d_k).
+        #
+        # To prepare the output for the final linear layer, we need to
+        # reshape x to (batch, seq_len, d_model). We do this by first
+        # transposing the tensor so that the sequence length is the second
+        # dimension, and then reshaping the tensor to (batch, seq_len, d_model).
+        # The '-1' in the view function means that the size of the last dimension
+        # is inferred from the other dimensions.
+        #
+        # The contiguous function is used to make sure that the tensor is
+        # contiguous in memory, which can improve performance.
+        # The contiguous function is used to make sure that the tensor is
+        # contiguous in memory. This can improve performance, because many
+        # operations in PyTorch are optimized for contiguous tensors.
+        #
+        # When you call view on a tensor, it returns a new tensor that shares
+        # the same underlying data as the original tensor, but with a different
+        # size and stride. However, the resulting tensor may not be contiguous
+        # in memory, because it may have "holes" or "gaps" in the memory.
+        #
+        # For example, if you have a tensor of shape (3, 4, 5) and you call
+        # view to reshape it to (6, 10), the resulting tensor will have a
+        # stride of (5, 1) and a size of (6, 10), but it will not be contiguous
+        # in memory. This is because the original tensor has a stride of (4, 5)
+        # and a size of (3, 4, 5), so the memory layout of the original tensor
+        # is not compatible with the memory layout of the reshaped tensor.
+        #
+        # The contiguous function takes a tensor as input and returns a new
+        # tensor that has the same size and stride as the original tensor, but
+        # is contiguous in memory. This is done by allocating new memory for
+        # the tensor and copying the data from the original tensor to the new
+        # tensor.
+        #
+        # The contiguous function is useful when you need to make sure that a
+        # tensor is contiguous in memory, but you don't want to allocate new
+        # memory for the tensor. This can be the case when you are working with
+        # large tensors and you want to avoid allocating new memory.
+        #
+        # The contiguous function is also useful when you are working with
+        # tensors that have a complex memory layout, such as tensors that have
+        # been reshaped or tensors that have been sliced. In these cases, the
+        # contiguous function can be used to make sure that the tensor is
+        # contiguous in memory, even if the original tensor is not contiguous.
+        #
+
+
+class ResidualConnection(nn.Module):
+    def __init__(self, dropout: float) -> None:
+        """
+        Parameters:
+        - dropout: The dropout rate to be used in the Dropout layer
+
+        Initializes the ResidualConnection module.
+        The ResidualConnection module is a class that is used to create a residual connection
+        between two layers. It applies a dropout to the output of the previous layer and then
+        adds the output of the previous layer to the output of the current layer.
+        """
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        self.norm = LayerNorm()
+
+    def forward(self, x, sublayer):
+        """
+        Parameters:
+        - x: The input to the residual connection
+        - sublayer: The sublayer to be used in the residual connection
+
+        Returns:
+        - The output of the residual connection
+
+        Applies a residual connection to the sublayer. The residual connection
+        is a module that is used to connect the output of two layers. It applies
+        a dropout to the output of the previous layer and then adds the output
+        of the previous layer to the output of the current layer.
+        """
+        return x + self.dropout(sublayer(self.norm(x)))
+
+
+class EncoderBlock(nn.Module):
+    def __init__(
+        self,
+        self_attention_block: MultiHeadAttentionBlock,
+        feed_forward_block: FeedForwardBlock,
+        dropout: float,
+    ):
+        super().__init__()
+        self.self_attention_block = self_attention_block
+        self.feed_forward_block = feed_forward_block
+        self.residual_connection = nn.ModuleList(
+            [ResidualConnection(dropout) for _ in range(2)]
+        )
+
+    def forward(self, x, src_mask):
+        x = self.residual_connection[0](
+            x, lambda x: self.self_attention_block(x, x, x, src_mask)
+        )
+        x = self.residual_connection[1](x, self.feed_forward_block)
+        return x
+
+
+class Encoder(nn.Module):
+    def __init__(self, layers: nn.ModuleList) -> None:
+        super().__init__()
+        self.layers = layers
+        self.norm = LayerNorm()
+
+    def forward(self, x, mask):
+        for layer in self.layers:
+            x = layer(x, mask)
+        return self.norm(x)
+
+    # In the EncoderBlock class, a lambda function is used in the first layer 
+    # of residual_connection to wrap the self.self_attention_block function, 
+    # but not in the second layer.
+
+    # The reason for this difference is that self.self_attention_block expects 
+    # four arguments (q, k, v, and mask), but self.feed_forward_block expects 
+    # only one argument (x).
