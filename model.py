@@ -106,3 +106,112 @@ class LayerNorm(nn.Module):
         std = x.std(dim=-1, keepdim=True)
 
         return self.alpha * (x - mean) / (std + self.eps) + self.beta
+
+
+## FeedForward Class
+## Applies a feedforward neural network to the input embeddings
+
+
+class FeedForwardBlock(nn.Module):
+    def __init__(self, d_model, d_ff, dropout=0.1):
+        super().__init__()
+        # self.linear1 is a fully connected layer with an input size of d_model
+        # and an output size of d_ff. It applies a linear transformation to the
+        # input and produces an output of shape (Batch_size, Sequence_length, d_ff).
+        # The number of neurons in this layer is d_ff.
+        # The output of this layer is passed through a ReLU activation function
+        self.linear1 = nn.Linear(d_model, d_ff)
+
+        # self.linear2 is a fully connected layer with an input size of d_ff
+        # and an output size of d_model. It applies a linear transformation to the
+        # input and produces an output of shape (Batch_size, Sequence_length, d_model).
+        # The number of neurons in this layer is d_model.
+        # The output of this layer is passed through a Dropout layer with a dropout rate of dropout.
+        self.linear2 = nn.Linear(d_ff, d_model)
+
+        # self.dropout is a Dropout layer with a dropout rate of dropout.
+        # It randomly sets dropout% of the output of the previous layer to 0.
+        # The output of this layer is passed through a ReLU activation function.
+        self.dropout = nn.Dropout(dropout)
+
+        # dummy example
+        # x = torch.randn(2, 3, d_model)  # (Batch_size, Sequence_length, d_model)
+        # out1 = self.linear1(x)
+        # print(out1.shape)  # (Batch_size, Sequence_length, d_ff)
+        # out2 = self.linear2(out1)
+        # print(out2.shape)  # (Batch_size, Sequence_length, d_model)
+
+        def forward(self, x):
+            return self.linear2(self.dropout(torch.relu(self.linear1(x))))
+
+
+class MultiHeadAttentionBlock(nn.Module):
+
+    def __init__(self, d_model: int, h: int, dropout: float):
+        super().__init__()
+        self.d_model = d_model
+        self.h = h
+        self.dropout = nn.Dropout(dropout)
+
+        assert d_model % h == 0, "d_model is not divisible by h"
+
+        self.d_k = d_model // h
+        self.w_q = nn.Linear(d_model, d_model)
+        self.w_k = nn.Linear(d_model, d_model)
+        self.w_v = nn.Linear(d_model, d_model)
+        self.w_o = nn.Linear(d_model, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+    @staticmethod
+    def attention(q, k, v, mask, dropout: nn.Dropout):
+        d_k = q.shape[-1]
+        attention_score = (q @ k.transpose(-2, -1)) / math.sqrt(d_k)
+        ## k goes from (batch, h, seq_len, d_k) --> (batch, h, d_k, seq_len)
+        ## attention shape --> (batch, h, seq_len, seq_len)
+
+        if mask is not None:
+            attention_score = attention_score.masked_fill(mask == 0, -1e9)
+        # Apply softmax to the attention scores. The softmax operation is
+        # applied along the last dimension (dim=-1) of the tensor.
+        # The softmax function takes the input tensor and returns a tensor of
+        # the same shape, where all the values are in the range [0, 1] and the
+        # sum of all the values is 1.
+        # The dim=-1 argument means that the softmax operation is applied
+        # along the last dimension of the tensor.
+        # The reason for applying softmax is to ensure that the attention
+        # weights are normalized and the model can focus on the most important
+        # parts of the input sequence.
+
+        attention_score = attention_score.softmax(
+            dim=-1
+        )  # (batch, h, seq_len, seq_len)
+
+        if dropout is not None:
+            attention_score = dropout(attention_score)
+
+        ##shape of attention_score @ v --> (batch, h, seq_len, d_k)
+        return (attention_score @ v), attention_score
+
+    def forward(self, q, k, v, mask):
+        query = self.w_q(q)  ## (batch , seq_len, d_model) --> (batch, seq_len, d_model)
+        key = self.w_k(k)  ## (batch , seq_len, d_model) --> (batch, seq_len, d_model)
+        value = self.w_v(v)  ## (batch , seq_len, d_model) --> (batch, seq_len, d_model)
+
+        ## (batch, seq_len, d_model) --> (batch, seq_len, h, d_k)
+        query = query.view(query.shape[0], query.shape[1], self.h, self.d_k)
+        key = key.view(key.shape[0], key.shape[1], self.h, self.d_k)
+        value = value.view(value.shape[0], value.shape[1], self.h, self.d_k)
+
+        ## (batch, seq_len, h, d_k) --> (batch, h, seq_len, d_k)
+        query = query.transpose(1, 2)
+        key = key.transpose(1, 2)
+        value = value.transpose(1, 2)
+
+        x, attention_score = MultiHeadAttentionBlock.attention(
+            query, key, value, mask, self.dropout
+        )
+
+        x = (
+            x.transpose(1, 2).contiguous().view(x.shape[0], -1, self.h * self.d_k)
+        )  # Shape of x is (batch, seq_len, d_model)
+        return self.w_o(x)
