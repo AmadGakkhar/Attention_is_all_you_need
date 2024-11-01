@@ -378,3 +378,98 @@ class DecoderModule(nn.Module):
         for layer in self.layers:
             x = layer(x, encoder_output, src_mask, trg_mask)
         return self.norm(x)
+
+
+class ProjectionLayer(nn.Module):
+    def __init__(self, d_model: int, vocab_size: int):
+        super().__init__()
+        self.proj = nn.Linear(d_model, vocab_size)
+
+        def forward(self, x):
+            # (batch, seq_len, d_model) --> (batch, seq_len, vocab_size)
+            return torch.log_softmax(self.proj(x), dim=-1)
+
+
+class Transformer(nn.Module):
+    def __init__(
+        self,
+        encoder: Encoder,
+        decoder: DecoderModule,
+        projection: ProjectionLayer,
+        src_embed: InputEmbeddings,
+        trg_embed: InputEmbeddings,
+        src_pos: PositionalEncoding,
+        trg_pos: PositionalEncoding,
+        projection_layer: ProjectionLayer,
+    ):
+
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+        self.projection = projection
+        self.src_embed = src_embed
+        self.trg_embed = trg_embed
+        self.src_pos = src_pos
+        self.trg_pos = trg_pos
+        self.projection_layer = projection_layer
+
+    def encode(self, src, src_mask):
+        src = self.src_embed(src)
+        src = self.src_pos(src)
+        return self.encoder(src, src_mask)
+
+    def decode(self, encoder_output, src_mask, trg, trg_mask):
+        trg = self.trg_embed(trg)
+        trg = self.trg_pos(trg)
+        return self.decoder(trg, encoder_output, src_mask, trg_mask)
+
+    def project(self, x):
+        return self.projection_layer(x)
+
+
+def build_transformer(
+    src_covab_size: int,
+    trg_vocab_size: int,
+    src_seq_len: int,
+    trg_seq_len: int,
+    d_model: int = 512,
+    N: int = 6,
+    h: int = 8,
+    dropout: float = 0.1,
+    dff: int = 2044,
+):
+
+    src_embed = InputEmbeddings(d_model, src_covab_size)
+    trg_embed = InputEmbeddings(d_model, trg_vocab_size)
+    src_pos = PositionalEncoding(d_model, dropout, src_seq_len)
+    trg_pos = PositionalEncoding(d_model, dropout, trg_seq_len)
+    encoder_blocks = []
+    for _ in range(N):
+        encoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
+        feed_forward_block = FeedForwardBlock(d_model, dff, dropout)
+        encoder_block = EncoderBlock(
+            encoder_self_attention_block, feed_forward_block, dropout
+        )
+        encoder_blocks.append(encoder_block)
+
+    decoder_blocks = []
+
+    for _ in range(N):
+        decoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
+        cross_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
+        feed_forward_block = FeedForwardBlock(d_model, dff, dropout)
+        decoder_block = DecoderBlock(
+            decoder_self_attention_block,
+            cross_attention_block,
+            feed_forward_block,
+            dropout,
+        )
+        decoder_blocks.append(decoder_block)
+
+    encoder = Encoder(nn.ModuleList(encoder_blocks))
+    decoder = DecoderModule(nn.ModuleList(decoder_blocks))
+    projection = ProjectionLayer(d_model, trg_vocab_size)
+
+    return Transformer(
+        encoder, decoder, projection, src_embed, trg_embed, src_pos, trg_pos, projection
+    )
