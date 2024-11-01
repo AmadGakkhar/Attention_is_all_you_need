@@ -470,6 +470,13 @@ def build_transformer(
     decoder = DecoderModule(nn.ModuleList(decoder_blocks))
     projection = ProjectionLayer(d_model, trg_vocab_size)
 
-    return Transformer(
+    transformer = Transformer(
         encoder, decoder, projection, src_embed, trg_embed, src_pos, trg_pos, projection
     )
+
+    # initialize Parameters
+    for p in transformer.parameters():
+        if p.dim() > 1:
+            nn.init.xavier_uniform_(p)
+
+    return transformer
