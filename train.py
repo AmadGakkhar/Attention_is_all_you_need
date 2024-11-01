@@ -10,6 +10,8 @@ from dataset import BilingualDataset, causal_mask
 
 from pathlib import Path
 
+from model import build_transformer
+
 
 def get_all_sentences(ds, lang):
     """
@@ -124,3 +126,14 @@ def get_ds(config):
     val_dataloader = DataLoader(val_ds, batch_size=1, shuffle=True)
 
     return train_dataloader, val_dataloader, tokenizer_src, tokenizer_trg
+
+
+def get_model(config, vocab_src_len, vocab_trg_len):
+    model = build_transformer(
+        vocab_src_len,
+        vocab_trg_len,
+        config["seq_len"],
+        config["seq_len"],
+        config["d_model"],
+    )
+    return model
