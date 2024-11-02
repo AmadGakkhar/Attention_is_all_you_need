@@ -1,0 +1,9 @@
+torch
+numpy
+pandas
+pathlib
+tqdm
+datasets
+tokenizers
+typing
+tensorboard

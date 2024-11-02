@@ -7,7 +7,7 @@ from tokenizers.models import WordLevel
 from tokenizers.trainers import WordLevelTrainer
 from tokenizers.pre_tokenizers import Whitespace
 from dataset import BilingualDataset, causal_mask
-import tqdm
+from tqdm import tqdm
 
 from pathlib import Path
 
@@ -60,9 +60,9 @@ def get_or_build_tokenizer(config, ds, lang):
             special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"], min_frequency=2
         )
         tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer=trainer)
-        tokenizer.save(tokenizer_path)
+        tokenizer.save(str(tokenizer_path))
     else:
-        tokenizer = Tokenizer.from_file(tokenizer_path)
+        tokenizer = Tokenizer.from_file(str(tokenizer_path))
     return tokenizer
 
 
@@ -92,7 +92,11 @@ def get_ds(config):
     # Trani test split
 
     train_ds_size = int(0.9 * len(ds))
-    val_ds_size = int(0.1 * len(ds))
+    val_ds_size = len(ds) - train_ds_size
+
+    print("Total Samples ", len(ds))
+    print("Train Samples ", train_ds_size)
+    print("Val Samples ", val_ds_size)
 
     train_ds_raw, val_ds_raw = random_split(ds, [train_ds_size, val_ds_size])
 
@@ -205,7 +209,7 @@ def train_model(config):
                 proj_output.view(-1, tokenizer_trg.get_vocab_size()), label.view(-1)
             )
 
-            batch_iterator.set_postfix(f"Loss : {loss.item():6.3f}")
+            batch_iterator.set_postfix({"Loss": f"{loss.item():6.3f}"})
 
             # Log loss in Tensorboard
 

@@ -9,7 +9,7 @@ import math
 
 
 class InputEmbeddings(nn.Module):
-    def __init__(self, vocab_size, d_model):
+    def __init__(self, d_model, vocab_size):
         """
         Parameters:
         - vocab_size: Size of the vocabulary
@@ -40,12 +40,12 @@ class InputEmbeddings(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, seq_len, dropout=0.1):
+    def __init__(self, d_model, dropout, seq_len):
         super().__init__()
 
         self.d_model = d_model
         self.seq_len = seq_len
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout = nn.Dropout(dropout)
 
         # Create a Matrix of shape (max_len, d_model)
         pe = torch.zeros(self.seq_len, self.d_model)
@@ -141,7 +141,7 @@ class FeedForwardBlock(nn.Module):
         # out2 = self.linear2(out1)
         # print(out2.shape)  # (Batch_size, Sequence_length, d_model)
 
-        def forward(self, x):
+    def forward(self, x):
             return self.linear2(self.dropout(torch.relu(self.linear1(x))))
 
 
